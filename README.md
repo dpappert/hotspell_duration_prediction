@@ -1,10 +1,28 @@
-# [Paper title]
+# Hotspell duration prediction
 
-> Code accompanying "[paper title]" ([link when available]).
+This repository contains code relating to the study in [journal, once
+known], titled '[paper title]'. Additional information can be found in the
+Supplement.
 
-Five model families (Random Forest, GAM, Logistic Regression, tabular MLP,
-CNN) predicting [target] from [predictors], evaluated across three regions.
-Four models use tabular predictors; the CNN uses gridded 2D input.
+It contains the Python code to perform the following:
+
+- validate (hyperparameter sweep, 7-fold member-based cross-validation) and
+  evaluate (held-out test set performance) five model families -- Random
+  Forest, GAM, Logistic Regression, a tabular MLP, and a CNN -- predicting
+  hot spell duration from precursor predictors
+- four of the five models (RF, GAM, LR, MLP) use tabular predictors; the
+  CNN uses gridded 2D input
+- all five are run across three regions (region codes `sw`, `w`, `n`)
+
+## Referencing
+
+If you use this code in your publication, please cite the corresponding
+article:
+
+- [Author list]: [Paper title], [Journal], [volume], [pages],
+  [https://doi.org/xxx], [year].
+
+Please report any issues on the GitHub portal.
 
 ## Setup
 
@@ -29,41 +47,82 @@ to confirm it's laid out correctly before running anything else.
 the repo -- see `data/cnn_grid/README.md`. Every other model runs fine
 without it.
 
-## Reproducing results
+## Supporting information about the scripts
 
 Each model has a **validate** entry point (hyperparameter sweep, 7-fold
-member-based CV) and an **eval** entry point (retrain on all non-test data
-with the best/fixed hyperparameters, report held-out test performance).
+member-based cross-validation) and an **eval** entry point (retrain on all
+non-test data with the best/fixed hyperparameters, report held-out test
+performance). To run a full hyperparameter grid rather than one combo at a
+time, use the matching driver in `scripts/sweeps/`.
 
-```bash
-# Random Forest
-python scripts/validate_rf.py --region w --n-estimators 100 --max-depth 5 \
-    --min-samples-split 10 --min-samples-leaf 5 --max-features log2 --criterion gini
-python scripts/eval_rf.py --region w
+### `scripts/check_data.py`
 
-# GAM
-python scripts/validate_gam.py --region w --lam 1 --n-splines 10
-python scripts/eval_gam.py --region w
+**Input:** nothing (reads `data/` as populated).
+**Output:** none written -- prints an OK/MISSING report per region for
+`data/targets/`, `data/tab_preds/`, and `data/cnn_grid/` to the console.
+Run this first, before anything else.
 
-# Logistic Regression (fixed baseline -- no validation sweep needed for eval)
-python scripts/eval_lr.py --region w
+### `scripts/validate_rf.py --region {sw,w,n} --n-estimators ... --max-depth ... [...]`
 
-# Tabular MLP (4 architectures: a, b, c, lin)
-python scripts/validate_mlp.py --arch a --region sw
-python scripts/eval_mlp.py --arch a --region sw
+**Input:** `data/targets/`, `data/tab_preds/` for the given region; RF
+hyperparameters as CLI flags (see `--help`).
+**Output:** `results/RF/scores/{region}/trial6/valid/metrics_{tag}.csv` --
+one row of pooled 7-fold train/val ROC-AUC and PRG-AUC for that combo.
 
-# CNN (7 architectures: a, b, c, d, lin, lr, mlp)
-python scripts/validate_cnn.py --arch a --region w
-python scripts/eval_cnn.py --arch a --region w
-```
+### `scripts/eval_rf.py --region {sw,w,n}`
 
-To run a full hyperparameter grid rather than one combo at a time, use the
-matching driver in `scripts/sweeps/` (e.g. `scripts/sweeps/sweep_rf.sh`
-runs every RF combo across all 3 regions). `scripts/sweeps/sweep_eval.sh`
-runs every eval script across all archs/regions once validation results
-exist.
+**Input:** all `metrics_*.csv` files under the matching `.../trial6/valid/`
+directory (i.e. run `validate_rf.py` -- ideally via `scripts/sweeps/sweep_rf.sh`
+-- first).
+**Output:** `results/RF/scores/{region}/trial6/eval/{tag}.csv` -- per-row
+`y_true`/`y_proba` on the held-out test set, using the best hyperparameter
+combo auto-selected from the validation results.
 
-Region codes: `sw`, `w`, `n` (matching the original filename suffixes).
+### `scripts/validate_gam.py --region {sw,w,n} --lam ... --n-splines ...`
+
+**Input/Output:** as RF above, under `results/GAM/scores/{region}/trial4/valid/`.
+
+### `scripts/eval_gam.py --region {sw,w,n}`
+
+**Input/Output:** as `eval_rf.py`, under `results/GAM/scores/{region}/trial4/eval/`.
+
+### `scripts/validate_lr.py --region {sw,w,n} --reg ... --penalty ... --solver ...`
+
+**Input/Output:** as RF above, under `results/LR/scores/{region}/trial7/valid/`.
+Exploratory only -- does not gate `eval_lr.py`'s hyperparameters (see below).
+
+### `scripts/eval_lr.py --region {sw,w,n}`
+
+**Input:** `data/targets/`, `data/tab_preds/` only -- no validation results
+needed. LR is this study's fixed baseline (C=1, L2, liblinear), not tuned.
+**Output:** `results/LR/scores/{region}/eval/{tag}.csv`, same format as
+`eval_rf.py`.
+
+### `scripts/validate_mlp.py --arch {a,b,c,lin} --region {sw,w,n}`
+
+**Input:** as RF above. Note: in the original study, `MLPa` was only ever
+run on region `sw`, and `MLPb`/`MLPc`/`MLPlin` only on region `n`.
+**Output:** `results/MLP/scores/{region}/MLP{arch}/valid/HPS_*.xlsx` -- one
+file per hyperparameter combo (`metrics`, `losses`, `epochs` sheets).
+
+### `scripts/eval_mlp.py --arch {a,b,c,lin} --region {sw,w,n}`
+
+**Input:** all `.xlsx` files under the matching `.../MLP{arch}/valid/` directory.
+**Output:** `results/MLP/scores/{region}/MLP{arch}/eval/{tag}.csv`,
+`y_true`/`y_proba` on the test set.
+
+### `scripts/validate_cnn.py --arch {a,b,c,d,lin,lr,mlp} --region {sw,w,n}`
+
+**Input:** `data/targets/`, `data/tab_preds/`, AND `data/cnn_grid/` for the
+given region (see `data/cnn_grid/README.md` -- not shipped in the repo).
+**Output:** `results/CNN/scores/{region}/{subdir}/valid/HPS_*.xlsx`, same
+format as the MLP validate output.
+
+### `scripts/eval_cnn.py --arch {a,b,c,d,lin,lr,mlp} --region {sw,w,n}`
+
+**Input:** all `.xlsx` files under the matching `.../valid/` directory,
+plus the same gridded data as `validate_cnn.py`.
+**Output:** `results/CNN/scores/{region}/{subdir}/eval/{tag}.csv`.
 
 ## Layout
 
