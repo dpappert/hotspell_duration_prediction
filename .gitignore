@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+build/
+dist/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+.env
+
+# OS
+.DS_Store
+
+# Results / large outputs (keep the folder, ignore contents)
+results/*
+!results/.gitkeep
+
+# Large gridded data — deliberately not shipped in the repo, see data/cnn_grid/README.md
+data/cnn_grid/*/*.nc
+
+# Editors
+.vscode/
+.idea/

@@ -1,0 +1,16 @@
+name: hwml
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - scikit-learn
+  - xarray
+  - netcdf4          # backend for xarray reading .nc files
+  - openpyxl         # needed for pandas ExcelWriter (ExtractedMetrics -> .xlsx)
+  - pip
+  - pip:
+      - pygam         # used by the GAM model
+      - torch         # CNN / MLP models (CPU build via pip; swap for conda pytorch if you need GPU)
