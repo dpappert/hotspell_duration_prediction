@@ -35,6 +35,79 @@ REGION_FOLDERS_LR = {
 }
 
 
+# region suffix used in original filenames (_sw/_w/_n) -> (region_index "f", grid "c")
+REGION_SUFFIX_TO_FC = {
+    "sw": (0, 1),
+    "w": (1, 2),
+    "n": (2, 4),
+}
+
+
+def _assemble_raw_table(region_index, region_folders=None, glob_pattern="*.txt"):
+    """
+    Read target + tab_preds and concatenate, WITHOUT any row filtering.
+    Row order/length matches the CNN grid's `event` dimension. Internal
+    building block -- use `load_table` (RF/GAM/LR/MLP, no paired grid) or
+    `load_table_for_cnn` (needs a mask to also filter the paired grid).
+    """
+    if region_folders is None:
+        region_folders = REGION_FOLDERS
+
+    folder = region_folders[region_index]
+    table_init = pd.read_csv(TARGETS_DIR / f"{folder}.txt", sep="\t")
+    member_ids = np.unique(table_init["member_id"])
+
+    file_list = sorted(glob.glob(str(TAB_PREDS_DIR / folder / glob_pattern)))
+    preds = [pd.read_csv(f, sep="\t") for f in file_list]
+    table_raw = pd.concat([table_init, pd.concat(preds, axis=1)], axis=1)
+
+    return table_raw, member_ids
+
+
+def load_table_for_cnn(region_index, region_folders=None, glob_pattern="*.txt"):
+    """
+    CNN-specific loader. The original CNN scripts filtered rows in two
+    separate steps -- drop DURATION==7 via a saved `ind7` index list, then
+    later drop +/-inf rows via a separately-computed `mask` -- applying
+    each step to TABLE_FULL and to the grid array X separately. This
+    computes the equivalent result as a single combined boolean mask
+    against the raw (pre-filter) table instead.
+
+    This is provably row-for-row equivalent to the original two-step
+    process: each row's keep/drop decision depends only on that row's own
+    values (DURATION==7 check, isinf check), never on other rows, so the
+    order of filtering doesn't change which rows survive. Returning one
+    mask (instead of the original's `ind7` + `mask` pair) also lets it be
+    applied directly to `load_cnn_grid`'s output without extra bookkeeping.
+
+    CNN scripts never call `.dropna()` -- not applied here either, matching
+    `load_table(..., drop_na=False)`.
+
+    Returns
+    -------
+    table_full : pd.DataFrame       (post-filtering, DURATION_bin inserted)
+    member_ids : np.ndarray
+    keep_mask : np.ndarray[bool]    (length == raw pre-filter row count;
+                                      apply directly to a `load_cnn_grid`
+                                      array's first axis)
+    """
+    if region_folders is None:
+        region_folders = REGION_FOLDERS
+
+    table_raw, member_ids = _assemble_raw_table(region_index, region_folders, glob_pattern)
+    table_raw = table_raw.copy()
+    table_raw.insert(3, "DURATION_bin", (table_raw["DURATION"] > 7).astype(int))
+
+    numeric_cols = table_raw.select_dtypes(include=[np.number])
+    not_inf = ~np.isinf(numeric_cols).any(axis=1)
+    not_duration7 = table_raw["DURATION"] != 7
+    keep_mask = (not_duration7 & not_inf).to_numpy()
+
+    table_full = table_raw[keep_mask]
+
+    return table_full, member_ids, keep_mask
+
+
 def load_table(region_index, region_folders=None, drop_na=True, glob_pattern="*.txt"):
     """
     Load + assemble TABLE_FULL for a given region.
@@ -71,15 +144,9 @@ def load_table(region_index, region_folders=None, drop_na=True, glob_pattern="*.
     if region_folders is None:
         region_folders = REGION_FOLDERS
 
-    folder = region_folders[region_index]
-    table_init = pd.read_csv(TARGETS_DIR / f"{folder}.txt", sep="\t")
-    member_ids = np.unique(table_init["member_id"])
+    table_raw, member_ids = _assemble_raw_table(region_index, region_folders, glob_pattern)
 
-    file_list = sorted(glob.glob(str(TAB_PREDS_DIR / folder / glob_pattern)))
-    preds = [pd.read_csv(f, sep="\t") for f in file_list]
-    table_full = pd.concat([table_init, pd.concat(preds, axis=1)], axis=1)
-
-    table_full = table_full[table_full["DURATION"] != 7]
+    table_full = table_raw[table_raw["DURATION"] != 7].copy()
     table_full.insert(3, "DURATION_bin", (table_full["DURATION"] > 7).astype(int))
 
     numeric_cols = table_full.select_dtypes(include=[np.number])
