@@ -1,8 +1,18 @@
 """
 Custom loss functions for the torch-based models (CNN, MLP).
 
-`FocalLoss` was verified byte-identical across all 21 CNN scripts and all
-4 MLP scripts before extraction -- no behavioural ambiguity here.
+`FocalLoss` below matches the CNN scripts' implementation, verified
+byte-identical across all 21 CNN scripts before extraction.
+
+CORRECTION: an earlier check claimed this was also byte-identical to the
+MLP scripts' FocalLoss -- that check had a bug. The MLP scripts (all 4,
+byte-identical to each other) use a simpler version: no configurable
+`reduction` param (hardcoded `.mean()`), no defensive `unsqueeze` on 1D
+targets. Verified this produces numerically identical output to the
+version below for how both scripts actually call it -- targets are always
+already 2D (`.unsqueeze(1)`'d before reaching the loss) and only the
+default mean-reduction path is ever used -- so this single implementation
+is reused for MLP too rather than keeping two near-duplicate classes.
 """
 import torch
 import torch.nn as nn
