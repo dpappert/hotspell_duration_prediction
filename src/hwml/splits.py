@@ -46,21 +46,11 @@ def generate_member_splits(member_ids, seed=0, test_prop=0.3, n_members_total=50
 
 def load_precomputed_splits(path):
     """
-    LR's validation sweep (`lr_trial7_valid.py`) does NOT use
-    `generate_member_splits` above. Instead it reads a pre-made
-    split-membership table from:
-
-        {DATA_DIR}/splits_9f_v5/cl{c}/k{s}_split_members.txt
-
-    selected via a `FOLD_SPLIT` (`s`) env var/arg, tab-separated, where
-    column 0 is the fixed test-member set and columns 1-5 are the five
-    validation folds (`for fold in range(1, 6)`).
-
-    This file/folder was not part of the uploaded scripts or data --
-    flagging so we can confirm whether it's intentional (a genuinely
-    different, more rigorous split scheme for LR specifically) or a
-    leftover from an earlier pipeline version, and if intentional, where
-    the split files should live in the new repo (`data/precomputed_splits/`
-    per `paths.SPLITS_DIR`?).
+    The original `lr_trial7_valid.py` did NOT use `generate_member_splits`
+    above -- it read a pre-made split-membership table from disk instead.
+    CONFIRMED (2024) this was a leftover from an earlier pipeline version,
+    not intentional: LR should use `generate_member_splits`, same as
+    RF/GAM/MLP. Kept here, unused, only as a record of the original
+    behaviour in case it's ever needed again.
     """
     return pd.read_csv(path, sep="\t")

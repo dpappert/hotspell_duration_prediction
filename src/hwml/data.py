@@ -23,10 +23,11 @@ REGION_FOLDERS = {
     2: "targets_cl4_HWs_m50_18512010_fmstat_1.5sd_r1",
 }
 
-# lr_trial7_valid.py uses a *different* date suffix (18512000, not 18512010)
-# for all three regions -- confirmed by diffing against every other script.
-# Not used by default; flagged here rather than silently picked. Needs
-# confirming before Step 5 (LR normalization) -- is this intentional?
+# lr_trial7_valid.py originally used a *different* date suffix (18512000,
+# not 18512010) for all three regions. CONFIRMED (2024) to be a bug, not
+# intentional -- LR should use REGION_FOLDERS like every other model.
+# Kept here, unused, only as a record of what the original script did;
+# Step 5 normalizes LR to REGION_FOLDERS + drop_na=True + iloc[:, 13:].
 REGION_FOLDERS_LR = {
     0: "targets_cl1_HWs_m50_18512000_fmstat_1.5sd_r1",
     1: "targets_cl2_HWs_m50_18512000_fmstat_1.5sd_r1",
@@ -53,13 +54,13 @@ def load_table(region_index, region_folders=None, drop_na=True, glob_pattern="*.
         Defaults to `REGION_FOLDERS`. Pass `REGION_FOLDERS_LR` to match the
         LR script's folder naming (see module docstring).
     drop_na : bool
-        RF, GAM, MLP and every `eval_*.py` script call `.dropna()` after the
-        inf-removal step. The CNN validation scripts and the LR validation
-        script do NOT. Defaults to True (the majority behaviour) -- pass
-        False when reproducing CNN or LR exactly.
+        RF, GAM, MLP, LR (after normalization) and every `eval_*.py` script
+        call `.dropna()` after the inf-removal step. Only the CNN
+        validation scripts do not. Defaults to True -- pass False when
+        reproducing CNN exactly.
     glob_pattern : str
-        Every script globs tab_preds with "*.txt" except the LR script,
-        which uses a bare "*". Defaults to "*.txt".
+        All scripts glob tab_preds with "*.txt" (LR originally used a bare
+        "*", normalized in Step 5). Defaults to "*.txt".
 
     Returns
     -------
